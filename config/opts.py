@@ -10,7 +10,7 @@ def parse_opt():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-f', default='self', help='To make it runnable in jupyter')
-    parser.add_argument('--root', type=str, default='/home/shuxinyang/data/mimic/finding/',
+    parser.add_argument('--root', type=str, default='preprocessing',
                         help='root path for experiment')
     parser.add_argument('--expe_name', type=str, default='con1_similar_sup',
                         help='path for saving trained models')
@@ -20,13 +20,13 @@ def parse_opt():
                         help='the selected basic model')
     parser.add_argument('--crop_size', type=int, default=224,
                         help='size for randomly cropping images')
-    parser.add_argument('--vocab_path', type=str, default='vocab.pkl',
+    parser.add_argument('--vocab_path', type=str, default='preprocessing/data/vocab.pkl',
                         help='path for vocabulary wrapper')
-    parser.add_argument('--image_dir', type=str, default='',
+    parser.add_argument('--image_dir', type=str, default='/Users/chenyusha/PycharmProjects/DeltaNet/preprocessing/data/archive/images/images_normalized',
                         help='directory for training images')
-    parser.add_argument('--caption_json', type=str, default='',
+    parser.add_argument('--caption_json', type=str, default='preprocessing/data/idx2caption.json',
                         help='path for train annotation json file')
-    parser.add_argument('--pair_list', type=str, default='',
+    parser.add_argument('--pair_list', type=str, default='/Users/chenyusha/PycharmProjects/DeltaNet/preprocessing/pair_list.csv',
                         help='path for image concepts json file')
     parser.add_argument('--log_step', type=int, default=10,
                         help='step size for printing log info')
@@ -59,7 +59,7 @@ def parse_opt():
     # Training details
     parser.add_argument('--pretrained', type=str, default='', help='start from checkpoint or scratch')
     parser.add_argument('--pretrained_cnn', type=str, default='', help='load pertraind_cnn parameters')
-    parser.add_argument('--num_epochs', type=int, default=100)
+    parser.add_argument('--num_epochs', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--clip', type=float, default=5)
@@ -73,7 +73,7 @@ def parse_opt():
     parser.add_argument('--n_best', type=int, default=1, help="""If verbose is set, will output the n_best
                                     decoded sentences""")
 
-    parser.add_argument('--dataset', type=str, default='mimic', help='dataset name')
+    parser.add_argument('--dataset', type=str, default='iu', help='dataset name')
     parser.add_argument('-g', '--gpu', type=str, default="4")
     parser.add_argument('-s', '--start_gen', type=int, default=1)
 

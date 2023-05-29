@@ -42,7 +42,7 @@ def attention(q, k, v, d_k, mask=None, dropout=None, return_alpha=False):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, heads, d_model, dropout=0.1, return_alpha=False):
+    def __init__(self, heads, d_model, dropout=0.1, return_alpha=False): #模型的维度 d_model
         super().__init__()
         self.alpha = return_alpha
 

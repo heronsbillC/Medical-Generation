@@ -103,7 +103,7 @@ def main(args):
             input_var = images.view(-1, c, h, w).cuda()
 
             # 10 * N_CLASSES
-            tag_features = model(input_var)
+            tag_features = model(input_var) #tag_features是14个类别的预测概率矩阵
             tag_features_mean = tag_features.mean(0)
 
             # 10 * 1024 * 7 * 7(if input 224 * 224)(if 512 * 512 -> 16 * 16)

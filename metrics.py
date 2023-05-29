@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 
-from pycocoevalcap.eval import calculate_metrics
+# from pycocoevalcap.eval import calculate_metrics
 
 
 def load_json(json_file):
@@ -35,7 +35,8 @@ def cal_epoch(result_path, epoch=0, mode='all', covid=False):
         })
 
     rng = range(len(test))
-    res = calculate_metrics(rng, datasetGTS, datasetRES, mode)
+    # res = calculate_metrics(rng, datasetGTS, datasetRES, mode)
+    res = []
     res['epoch'] = epoch
     # print(res)
     return res

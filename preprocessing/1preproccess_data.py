@@ -54,9 +54,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--root', type=str, default="data",
                         help="the begin directory of all")
-    parser.add_argument('-r', '--report', type=str, default="indiana_reports.csv",
+    parser.add_argument('-r', '--report', type=str, default="/Users/chenyusha/PycharmProjects/DeltaNet/preprocessing/data/indiana_reports.csv",
                         help="IU report file")
-    parser.add_argument('-p', '--projections', type=str, default="indiana_projections.csv",
+    parser.add_argument('-p', '--projections', type=str, default="/Users/chenyusha/PycharmProjects/DeltaNet/preprocessing/data/indiana_projections.csv",
                         help="indiana projections file")
     parser.add_argument('-o', '--output', type=str, default="",
                         help="output file save dir")

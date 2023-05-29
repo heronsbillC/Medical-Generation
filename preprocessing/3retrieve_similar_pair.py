@@ -1,5 +1,5 @@
 import argparse
-import os.path as osp
+import os
 
 import numpy as np
 import pandas as pd
@@ -53,17 +53,24 @@ def vector_distance(vec1, vec2, method = "l2", l2_normalize = True):
     return dist
 
 
-def get_simi(args, split_file, topk=10):
+def get_simi(args, topk=10):
     npy_file = {}
-    file_split = pd.read_csv(split_file)
     # load all data to memory
+    split_file = None
     for subset in SUBSET:
-        file_lists = file_split[file_split['split'] == subset]
-        for filename in file_lists['filename']:
-            npy_file[filename] = np.load(osp.join(args.feature, filename[:-3] + 'npy')).reshape(-1)
+        if "test" == subset:
+            split_file = pd.read_csv(os.path.join(args.root, args.test_split))
+        elif "train" == subset:
+            split_file = pd.read_csv(os.path.join(args.root, args.train_split))
+        elif "val" == subset:
+            split_file = pd.read_csv(os.path.join(args.root, args.val_split))
+
+        for filename in split_file['filename']:
+            filePath = os.path.join(args.root, os.path.join(args.feature, filename[:-3] + 'npy'))
+            npy_file[filename] = np.load(filePath).reshape(-1)
 
     # all similar from train set
-    train_lists = file_split[file_split['split'] == 'train']
+    train_lists = pd.read_csv(os.path.join(args.root, args.train_split))['filename']
 
     # prepare store top10 similar information by cosion distance
     simi_info = {"filename": [], 'split': [], 'method': []}
@@ -73,10 +80,17 @@ def get_simi(args, split_file, topk=10):
 
     for subset in SUBSET:
         print("========>> precess {} set".format(subset))
-        file_lists = file_split[file_split['split'] == subset]
-        for target in tqdm(file_lists['filename']):
+
+        if "test" == subset:
+            split_file = pd.read_csv(os.path.join(args.root, args.test_split))
+        elif "train" == subset:
+            split_file = pd.read_csv(os.path.join(args.root, args.train_split))
+        elif "val" == subset:
+            split_file = pd.read_csv(os.path.join(args.root, args.val_split))
+
+        for target in tqdm(split_file['filename']):
             this_simi = []
-            for pair_filename in train_lists['filename']:
+            for pair_filename in train_lists:
                 if target == pair_filename:
                     continue
 
@@ -92,7 +106,7 @@ def get_simi(args, split_file, topk=10):
                 simi_info["similar_{:d}".format(i)].append(this_simi["pair_filename"])
                 simi_info["distance_{:d}".format(i)].append(this_simi["similar_distance"])
 
-    csv_filename = osp.join(args.output, 'pair_list.csv')
+    csv_filename = os.path.join(args.output, 'pair_list.csv')
     csv_df = pd.DataFrame(simi_info)
     csv_df.to_csv(csv_filename, index=False)
 
@@ -101,8 +115,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--root', type=str, default="data",
                         help="the begin directory of all")
-    parser.add_argument('-s', '--split', type=str, default="split.csv",
-                        help="split file")
+    parser.add_argument('-s', '--test_split', type=str, default="test_split.csv",
+                        help="test split file")
+    parser.add_argument('-a', '--train_split', type=str, default="train_split.csv",
+                        help="train split file")
+    parser.add_argument('-b', '--val_split', type=str, default="val_split.csv",
+                        help="val split file")
     parser.add_argument('-f', '--feature', type=str, default="feature",
                         help="feature dir")
     parser.add_argument('-o', '--output', type=str, default="",
@@ -113,4 +131,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    get_simi(args, args.split)
+    get_simi(args)
