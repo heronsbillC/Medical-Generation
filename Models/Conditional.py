@@ -11,7 +11,7 @@ from Models.models import TransformerLayer
 from Models.SubLayers import MultiHeadAttention
 
 DROPOUT = 0.1  # Avoid overfitting
-NUM_HEADS = 8
+NUM_HEADS = 1
 NUM_LAYERS = 1
 
 def init_weight(f):
@@ -56,9 +56,9 @@ class EncoderCNN(nn.Module):
         Output: V=[v_1, ..., v_n]
         '''
         '''
-        bs：批处理大小（即一次处理的图像数量）
+        bs：批处理大小（同时处理的样本数量）
         c：图像通道数（例如，灰度图像为1，RGB图像为3）
-        n：图像序列的长度
+        n：图像个数
         h：图像的高度（以像素为单位）
         w：图像的宽度（以像素为单位）
         '''
@@ -141,7 +141,7 @@ class ConditionText(nn.Module):
     """generate conT from conditional
     """
 
-    def __init__(self, d_model, n_head=8, d_ff=2048, dropout=0.1, N=1):
+    def __init__(self, d_model, n_head=NUM_HEADS, d_ff=2048, dropout=0.1, N=1):
         super(ConditionText, self).__init__()
         self.N = N
         self.attI = MultiHeadAttention(n_head, d_model, dropout)
@@ -170,7 +170,7 @@ class ConditionText(nn.Module):
 # Caption Decoder
 class Decoder(nn.Module):
     def __init__(self, embed_size, vocab_size, hidden_size, N=1, v_size=49,
-                 num_layers=6, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1):
+                 num_layers=6, d_model=512, nhead=NUM_HEADS, dim_feedforward=2048, dropout=0.1):
         super(Decoder, self).__init__()
 
         self.N = N
@@ -193,9 +193,9 @@ class Decoder(nn.Module):
         # bs x 49 x d_model
         _, curr_vf = V[:, 0], V[:, -1]
         # bs x 1 x d_model
-        v_a = torch.mean(curr_vf, dim=1, keepdim=True)
+        # v_a = torch.mean(curr_vf, dim=1, keepdim=True)
         # bs x len x d_model*2
-        x = torch.cat((embeddings, v_a.expand_as(embeddings)), dim=2)
+        # x = torch.cat((embeddings, v_a.expand_as(embeddings)), dim=2)
 
         # Transformer Decoder Block
         # tgt = x.permute(1, 0, 2)
@@ -204,8 +204,8 @@ class Decoder(nn.Module):
         #Transformer解码器模块中，如果没有提供掩码，则默认使用全1矩阵作为掩码，表示模型可以使用所有的目标序列信息进行预测
         #用于屏蔽目标序列中当前时间步之后的位置，以避免模型在预测时使用未来的信息
         #产生一个上三角矩阵，下三角的值全为1，上三角的值权威0，对角线也是1。
-        tgt_mask = nn.Transformer().generate_square_subsequent_mask(x.size(1)).to(x.device)
-        tgt_mask = tgt_mask.unsqueeze(0).expand(512, -1, -1) #tgt_mask的形状应该是(seq_len, seq_len)，其中seq_len是目标序列的长度
+        tgt_mask = nn.Transformer().generate_square_subsequent_mask(tgt.size(0)).to(tgt.device)
+        tgt_mask = tgt_mask.unsqueeze(0).expand(tgt.size(1), -1, -1) #tgt_mask的形状应该是(seq_len, seq_len)，其中seq_len是目标序列的长度
         memory_mask = None
         #tgt：解码器模块的目标序列，目标序列通常是指图像描述中的文字序列 memory：编码器模块的输出序列，图像特征
         #目标序列通常是指图像描述中的文本序列。在图像描述任务中，我们希望生成一个与输入图片相对应的文字序列，因此我们需要将输入图片的视觉信息融入到生成的文本序列中，以保证生成的描述与输入图片相符。
