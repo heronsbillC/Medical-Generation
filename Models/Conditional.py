@@ -187,7 +187,7 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     # images, prev_repo, target
-    def forward(self, V, T, captions):
+    def forward(self, V, T, captions, basic_model):
         # Word Embedding, bs x len x d_model
         embeddings = self.caption_embed(captions)
         # bs x 49 x d_model
