@@ -11,8 +11,10 @@ from Models.models import TransformerLayer
 from Models.SubLayers import MultiHeadAttention
 
 DROPOUT = 0.1  # Avoid overfitting
-NUM_HEADS = 1
+NUM_HEADS = 8
 NUM_LAYERS = 1
+NUM_EMBEDS = 256
+FWD_DIM = 256
 
 def init_weight(f):
     init.kaiming_uniform_(f.weight, mode='fan_in')
@@ -90,7 +92,6 @@ class TNN(nn.Module):
             [TransformerLayer(embed_dim, num_heads, fwd_dim, dropout) for _ in range(num_layers)])
         self.dropout = nn.Dropout(dropout)
 
-    #todo 确认pad_id的值
     def forward(self, txt=None, pad_mask=None, att_mask=None):
         if txt != None:
             if pad_mask == None:
@@ -115,7 +116,7 @@ class EncoderTXT(nn.Module):
         super(EncoderTXT, self).__init__()
         self.N = N
         self.embed = nn.Embedding(vocab_size, embed_size)
-        self.tnn = TNN(embed_dim=embed_size, num_heads=NUM_HEADS, fwd_dim=hidden_size, dropout=DROPOUT, num_layers=NUM_LAYERS,
+        self.tnn = TNN(embed_dim=embed_size, num_heads=NUM_HEADS, fwd_dim=FWD_DIM, dropout=DROPOUT, num_layers=NUM_LAYERS,
                   vocab_size=vocab_size)
 
     def forward(self, input):
@@ -170,10 +171,11 @@ class ConditionText(nn.Module):
 # Caption Decoder
 class Decoder(nn.Module):
     def __init__(self, embed_size, vocab_size, hidden_size, N=1, v_size=49,
-                 num_layers=6, d_model=512, nhead=NUM_HEADS, dim_feedforward=2048, dropout=0.1):
+                 num_layers=12, d_model=256, nhead=1, dim_feedforward=FWD_DIM, dropout=DROPOUT):
         super(Decoder, self).__init__()
 
         self.N = N
+        self.nhead = nhead
         # word embedding
         self.caption_embed = nn.Embedding(vocab_size, embed_size)
         self.transformer_decoder = nn.TransformerDecoder(
@@ -205,7 +207,7 @@ class Decoder(nn.Module):
         #用于屏蔽目标序列中当前时间步之后的位置，以避免模型在预测时使用未来的信息
         #产生一个上三角矩阵，下三角的值全为1，上三角的值权威0，对角线也是1。
         tgt_mask = nn.Transformer().generate_square_subsequent_mask(tgt.size(0)).to(tgt.device)
-        tgt_mask = tgt_mask.unsqueeze(0).expand(tgt.size(1), -1, -1) #tgt_mask的形状应该是(seq_len, seq_len)，其中seq_len是目标序列的长度
+        tgt_mask = tgt_mask.unsqueeze(0).expand(tgt.size(1) * self.nhead, -1, -1) #tgt_mask的形状应该是(seq_len, seq_len)，其中seq_len是目标序列的长度
         memory_mask = None
         #tgt：解码器模块的目标序列，目标序列通常是指图像描述中的文字序列 memory：编码器模块的输出序列，图像特征
         #目标序列通常是指图像描述中的文本序列。在图像描述任务中，我们希望生成一个与输入图片相对应的文字序列，因此我们需要将输入图片的视觉信息融入到生成的文本序列中，以保证生成的描述与输入图片相符。
@@ -249,7 +251,7 @@ class Encoder2Decoder(nn.Module):
 
         # Language Modeling on word prediction
         # bs x len x vocab_size
-        scores = self.decoder(V, T, captions)
+        scores = self.decoder(V, T, captions, basic_model)
 
         # Pack it to make criterion calculation more efficient
         packed_scores = pack_padded_sequence(scores, lengths, batch_first=True)

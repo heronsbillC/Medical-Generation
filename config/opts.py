@@ -47,13 +47,13 @@ def parse_opt():
                         help='alpha in Adam')
     parser.add_argument('--beta', type=float, default=0.999,
                         help='beta in Adam')
-    parser.add_argument('--learning_rate', type=float, default=5e-4,
+    parser.add_argument('--learning_rate', type=float, default=3e-5,
                         help='learning rate for the whole model')
 
     # LSTM hyper parameters
-    parser.add_argument('--embed_size', type=int, default=512,
+    parser.add_argument('--embed_size', type=int, default=256,
                         help='dimension of word embedding vectors')
-    parser.add_argument('--hidden_size', type=int, default=512,
+    parser.add_argument('--hidden_size', type=int, default=256,
                         help='dimension of lstm hidden states')
 
     # Training details
