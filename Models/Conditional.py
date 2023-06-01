@@ -12,9 +12,9 @@ from Models.SubLayers import MultiHeadAttention
 
 DROPOUT = 0.1  # Avoid overfitting
 NUM_HEADS = 8
-NUM_LAYERS = 1
+NUM_LAYERS = 4
 NUM_EMBEDS = 256
-FWD_DIM = 256
+FWD_DIM = 512
 
 def init_weight(f):
     init.kaiming_uniform_(f.weight, mode='fan_in')
@@ -171,7 +171,7 @@ class ConditionText(nn.Module):
 # Caption Decoder
 class Decoder(nn.Module):
     def __init__(self, embed_size, vocab_size, hidden_size, N=1, v_size=49,
-                 num_layers=12, d_model=256, nhead=1, dim_feedforward=FWD_DIM, dropout=DROPOUT):
+                 num_layers=6, d_model=256, nhead=8, dim_feedforward=FWD_DIM, dropout=DROPOUT):
         super(Decoder, self).__init__()
 
         self.N = N
