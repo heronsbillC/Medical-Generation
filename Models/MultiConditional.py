@@ -4,11 +4,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
+import Models.Conditional as Conditional
 from torch.nn import init
 from torch.nn.utils.rnn import pack_padded_sequence
+from Models.models import PositionalEncoding
 
 from Models.SubLayers import MultiHeadAttention
 
+
+DROPOUT = 0.1  # Avoid overfitting
+NUM_HEADS = 8
+NUM_LAYERS = 4
+NUM_EMBEDS = 256
+FWD_DIM = 512
 
 def init_weight(f):
     init.kaiming_uniform_(f.weight, mode='fan_in')
@@ -145,33 +153,30 @@ class ConditionText(nn.Module):
 
 # Caption Decoder
 class Decoder(nn.Module):
-    def __init__(self, embed_size, vocab_size, hidden_size, N=1, v_size=49):
+    def __init__(self, embed_size, vocab_size, hidden_size, N=1, v_size=49,
+                 num_layers=6, d_model=256, nhead=8, dim_feedforward=FWD_DIM, dropout=DROPOUT):
         super(Decoder, self).__init__()
         self.N = N
-
+        self.nhead = nhead
         self.affine_va = nn.Linear(hidden_size, embed_size)
 
         # word embedding
         self.caption_embed = nn.Embedding(vocab_size, embed_size)
+        self.pos_encoder = PositionalEncoding(embed_size, dropout)
+        self.transformer_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward,dropout=dropout),
+            num_layers=4)
 
-        # copying by gating
-        # self.copying = GateCopying(hidden_size, N)
-
+        self.transformer_decoder = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout),
+            num_layers=num_layers
+        )
         # Conditional Report
-        self.condition = ConditionText(embed_size, n_head=8, d_ff=2048, N=N)
-
-        # LSTM decoder
-        self.LSTM = nn.LSTM(embed_size, hidden_size, 1, batch_first=True)
-
-        # Save hidden_size for hidden variable
-        self.hidden_size = hidden_size
-
+        self.condition = ConditionText(embed_size, n_head=nhead, d_ff=dim_feedforward, N=N)
         # Attention Block
-        self.attention = MultiHeadAttention(heads=8, d_model=hidden_size)
-
+        self.attention = MultiHeadAttention(heads=nhead, d_model=hidden_size, dropout=dropout)
         # Final Caption generator
         self.mlp = nn.Linear(hidden_size * 4, vocab_size)
-
         self.dropout = nn.Dropout(0.5)
         self.init_weights()
 
@@ -181,35 +186,35 @@ class Decoder(nn.Module):
         init.kaiming_normal_(self.mlp.weight, mode='fan_in')
         self.mlp.bias.data.fill_(0)
 
+    # images, prev_repo, target
     def forward(self, V, T, captions, basic_model, states=None):
         # Word Embedding, bs x len x d_model
         embeddings = self.caption_embed(captions)
-        bs, tlen, d_m = embeddings.size()
-
-        # Hiddens: Batch x seq_len x hidden_size
-        hiddents = torch.zeros(bs, tlen, d_m)
-        if torch.cuda.is_available():
-            hiddents = hiddents.cuda()
+        embeddings = embeddings.transpose(0, 1)  # seq_len x bs x d_model
+        embeddings = self.pos_encoder(embeddings)  # seq_len x bs x d_model
+        # Encoder
+        encoded = self.transformer_encoder(embeddings)
 
         # bs x 49 x d_model
         _, curr_vf = V[:, 0], V[:, -1]
-        # bs x len x d_model
-        x = embeddings
-        # Recurrent Block
-        for time_step in range(embeddings.size(1)):
-            # Feed in x_t one at a time
-            x_t = x[:, time_step, :]  # bs x d_model
-            x_t = x_t.unsqueeze(1)  # bs x 1 x d_model
 
-            # h_t: # bs x 1 x d_model
-            h_t, states = self.LSTM(x_t, states)  # Batch_first
+        # Transformer Decoder Block
+        tgt = encoded
+        memory = curr_vf.permute(1, 0, 2)
+        # Transformer解码器模块中，如果没有提供掩码，则默认使用全1矩阵作为掩码，表示模型可以使用所有的目标序列信息进行预测
+        # 用于屏蔽目标序列中当前时间步之后的位置，以避免模型在预测时使用未来的信息
+        # 产生一个上三角矩阵，下三角的值全为1，上三角的值权威0，对角线也是1。
+        tgt_mask = nn.Transformer().generate_square_subsequent_mask(tgt.size(0)).to(tgt.device)
+        tgt_mask = tgt_mask.unsqueeze(0).expand(tgt.size(1) * self.nhead, -1,
+                                                -1)  # tgt_mask的形状应该是(seq_len, seq_len)，其中seq_len是目标序列的长度
+        memory_mask = None
+        # tgt：解码器模块的目标序列，目标序列通常是指图像描述中的文字序列 memory：编码器模块的输出序列，图像特征
+        # 目标序列通常是指图像描述中的文本序列。在图像描述任务中，我们希望生成一个与输入图片相对应的文字序列，因此我们需要将输入图片的视觉信息融入到生成的文本序列中，以保证生成的描述与输入图片相符。
+        output = self.transformer_decoder(tgt, memory, tgt_mask=tgt_mask, memory_mask=memory_mask)
 
-            # Save hidden
-            hiddents[:, time_step] = h_t.squeeze(1)
-
-        conI, conT = self.condition(hiddents, V, T)
-        ctx = self.attention(hiddents, curr_vf, curr_vf)
-        output = torch.cat([hiddents, ctx, conI, conT], dim=2)
+        conI, conT = self.condition(output.permute(1, 0, 2), V, T)
+        ctx = self.attention(output.permute(1, 0, 2), curr_vf, curr_vf)
+        output = torch.cat([output.permute(1, 0, 2), ctx, conI, conT], dim=2)
         # Final score along vocabulary
         #  bs x len x vocab_size
         scores = self.mlp(self.dropout(output))
@@ -224,10 +229,10 @@ class Encoder2Decoder(nn.Module):
         super(Encoder2Decoder, self).__init__()
 
         # Image CNN encoder
-        self.encoder_image = EncoderCNN(embed_size, hidden_size, N)
+        self.encoder_image = Conditional.EncoderCNN(embed_size, hidden_size, N)
 
         # Concept encoder
-        self.encoder_concept = EncoderTXT(vocab_size, embed_size, hidden_size, N)
+        self.encoder_concept = Conditional.EncoderTXT(vocab_size, embed_size, hidden_size, N)
 
         # Caption Decoder
         self.decoder = Decoder(embed_size, vocab_size, hidden_size, N)

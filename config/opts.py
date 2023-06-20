@@ -14,7 +14,7 @@ def parse_opt():
                         help='root path for experiment')
     parser.add_argument('--expe_name', type=str, default='con1_similar_sup',
                         help='path for saving trained models')
-    parser.add_argument('--N', type=int, default=1,
+    parser.add_argument('--N', type=int, default=3,
                         help='number of similar')
     parser.add_argument('--basic_model', type=str, default='VisualAttention',
                         help='the selected basic model')
