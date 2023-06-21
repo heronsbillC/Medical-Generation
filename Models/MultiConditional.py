@@ -13,8 +13,6 @@ from Models.SubLayers import MultiHeadAttention
 
 
 DROPOUT = 0.1  # Avoid overfitting
-NUM_HEADS = 8
-NUM_LAYERS = 4
 NUM_EMBEDS = 256
 FWD_DIM = 512
 
@@ -158,7 +156,6 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.N = N
         self.nhead = nhead
-        self.affine_va = nn.Linear(hidden_size, embed_size)
 
         # word embedding
         self.caption_embed = nn.Embedding(vocab_size, embed_size)
@@ -181,8 +178,6 @@ class Decoder(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        init.kaiming_uniform_(self.affine_va.weight, mode='fan_in')
-        self.affine_va.bias.data.fill_(0)
         init.kaiming_normal_(self.mlp.weight, mode='fan_in')
         self.mlp.bias.data.fill_(0)
 
@@ -193,13 +188,13 @@ class Decoder(nn.Module):
         embeddings = embeddings.transpose(0, 1)  # seq_len x bs x d_model
         embeddings = self.pos_encoder(embeddings)  # seq_len x bs x d_model
         # Encoder
-        encoded = self.transformer_encoder(embeddings)
+        # encoded = self.transformer_encoder(embeddings)
 
         # bs x 49 x d_model
         _, curr_vf = V[:, 0], V[:, -1]
 
         # Transformer Decoder Block
-        tgt = encoded
+        tgt = embeddings
         memory = curr_vf.permute(1, 0, 2)
         # Transformer解码器模块中，如果没有提供掩码，则默认使用全1矩阵作为掩码，表示模型可以使用所有的目标序列信息进行预测
         # 用于屏蔽目标序列中当前时间步之后的位置，以避免模型在预测时使用未来的信息

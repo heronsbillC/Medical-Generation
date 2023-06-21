@@ -185,7 +185,7 @@ class Decoder(nn.Module):
         self.condition = ConditionText(embed_size, n_head=nhead, d_ff=dim_feedforward, N=N)
         # Attention Block
         self.attention = MultiHeadAttention(heads=nhead, d_model=hidden_size, dropout=dropout)
-        self.mlp = nn.Linear(hidden_size * 4, vocab_size)
+        self.mlp = nn.Linear(hidden_size * 4, vocab_size) #线性层将输入的特征转换为输出的特征
         self.dropout = nn.Dropout(dropout)
 
     # images, prev_repo, target
