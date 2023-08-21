@@ -14,7 +14,7 @@ def parse_opt():
                         help='root path for experiment')
     parser.add_argument('--expe_name', type=str, default='con1_similar_sup',
                         help='path for saving trained models')
-    parser.add_argument('--N', type=int, default=3,
+    parser.add_argument('--N', type=int, default=1,
                         help='number of similar')
     parser.add_argument('--basic_model', type=str, default='VisualAttention',
                         help='the selected basic model')
@@ -51,9 +51,9 @@ def parse_opt():
                         help='learning rate for the whole model')
 
     # LSTM hyper parameters
-    parser.add_argument('--embed_size', type=int, default=256,
+    parser.add_argument('--embed_size', type=int, default=512,
                         help='dimension of word embedding vectors')
-    parser.add_argument('--hidden_size', type=int, default=256,
+    parser.add_argument('--hidden_size', type=int, default=512,
                         help='dimension of lstm hidden states')
 
     # Training details
@@ -69,12 +69,12 @@ def parse_opt():
 
     # Generattion parameters
     parser.add_argument('--beam_size', type=int, default=3, help='Beam size')
-    parser.add_argument('--max_length', type=int, default=60, help='The maximum length of generated target.')
+    parser.add_argument('--max_length', type=int, default=106, help='The maximum length of generated target.')
     parser.add_argument('--n_best', type=int, default=1, help="""If verbose is set, will output the n_best
                                     decoded sentences""")
 
     parser.add_argument('--dataset', type=str, default='iu', help='dataset name')
-    parser.add_argument('-g', '--gpu', type=str, default="4")
+    parser.add_argument('-g', '--gpu', type=str, default="0")
     parser.add_argument('-s', '--start_gen', type=int, default=1)
 
     # config

@@ -3,18 +3,22 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torchvision.models as models
 from torch.nn import init
 from torch.nn.utils.rnn import pack_padded_sequence
 from Models.models import TransformerLayer
+from torch.nn.utils.rnn import pad_sequence
 
 from Models.SubLayers import MultiHeadAttention
+from Models.models import MultiheadAttention
 
 DROPOUT = 0.1  # Avoid overfitting
 NUM_HEADS = 8
 NUM_LAYERS = 4
 NUM_EMBEDS = 256
 FWD_DIM = 512
+fixed_sequence_length = 120
 
 def init_weight(f):
     init.kaiming_uniform_(f.weight, mode='fan_in')
@@ -147,6 +151,8 @@ class ConditionText(nn.Module):
         self.N = N
         self.attI = MultiHeadAttention(n_head, d_model, dropout)
         self.attT = MultiHeadAttention(n_head, d_model, dropout)
+        # self.attI = MultiheadAttention(d_model, n_head, dropout)
+        # self.attT = MultiheadAttention(d_model, n_head, dropout)
 
     def forward(self, hiddents, V, T):
         Vs, Ts = [], []
@@ -222,6 +228,62 @@ class Decoder(nn.Module):
         scores = self.mlp(self.dropout(output))
         return scores
 
+class GptDecoder(nn.Module):
+    def __init__(self, embed_size, vocab_size, hidden_size, N=1, v_size=49,
+                 nhead=8, dim_feedforward=FWD_DIM, dropout=0.1):
+        super(GptDecoder, self).__init__()
+        self.N = N
+        self.nhead = nhead
+        self.gpt2 = GPT2LMHeadModel.from_pretrained('gpt2')
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.gpt2.resize_token_embeddings(len(self.tokenizer))
+        self.condition = ConditionText(embed_size, n_head=nhead, d_ff=dim_feedforward, N=N)
+        self.attention = MultiHeadAttention(heads=nhead, d_model=hidden_size, dropout=dropout)
+        # self.attention = MultiheadAttention(hidden_size, nhead, dropout)
+        self.mlp = nn.Linear(hidden_size * 4, vocab_size)
+        self.dropout = nn.Dropout(dropout)
+        self.q_linear = nn.Linear(50257, hidden_size)
+
+    def forward(self, V, T, captions, basic_model):
+        # Tokenize captions
+        # input_ids = self.tokenizer.encode(captions, return_tensors='pt')
+
+        # 初始化一个空列表，用于存储每个caption的编码结果
+        input_ids_list = []
+        captions = list(captions)  # 将captions从元组转换为列表
+        # 循环遍历每个caption
+        for caption in captions:
+            # 使用tokenizer对caption进行编码
+            input_ids = self.tokenizer.encode(caption, return_tensors='pt')
+            input_ids = input_ids.permute(1, 0)
+            # 将编码结果添加到列表中
+            input_ids_list.append(input_ids)
+
+        # 将列表转换为一个二维张量
+        # 对所有子序列进行填充，使得它们的长度相同
+        input_ids = pad_sequence(input_ids_list, batch_first=True,
+                                 padding_value=0)
+        input_ids = input_ids.squeeze(2)
+        output = self.gpt2(input_ids)[0]
+        # 将output的sequence_length切片或截断到指定长度
+        if output.size(1) > fixed_sequence_length:
+            output = output[:, :fixed_sequence_length, :]
+        elif output.size(1) < fixed_sequence_length:
+            padding = torch.zeros(output.size(0), fixed_sequence_length - output.size(1), output.size(2))
+            output = torch.cat([output, padding], dim=1)
+
+        q_mapped = self.q_linear(output)
+
+        # Condition Text
+        conI, conT = self.condition(q_mapped, V, T)
+        # Attention Block
+        _, curr_vf = V[:, 0], V[:, -1]
+        ctx = self.attention(q_mapped, curr_vf, curr_vf)
+        # Concatenation and Final Score
+        output = torch.cat([q_mapped, ctx, conI, conT], dim=2)
+        scores = self.mlp(self.dropout(output))
+        return scores
+
 
 # Whole Architecture with Image Encoder and Caption decoder
 class Encoder2Decoder(nn.Module):
@@ -235,10 +297,13 @@ class Encoder2Decoder(nn.Module):
         self.encoder_concept = EncoderTXT(vocab_size, embed_size, hidden_size, N)
 
         # Caption Decoder
-        self.decoder = Decoder(embed_size, vocab_size, hidden_size, N)
+        self.decoder = GptDecoder(embed_size, vocab_size, hidden_size, N)
 
         # Share the weight matrix between caption & concept word embeddings
-        self.encoder_concept.embed.weight = self.decoder.caption_embed.weight
+        # self.encoder_concept.embed.weight = self.decoder.caption_embed.weight
+
+        # Share the weight matrix  of GptDecoder
+        # self.encoder_concept.embed.weight = self.decoder.gpt2.transformer.wte.weight
 
         assert embed_size == hidden_size, "The values of embed_size and hidden_size should be equal."
 

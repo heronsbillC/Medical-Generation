@@ -127,6 +127,8 @@ class IUSimNDataSet(_DatasetBase):
             # name: 377_IM-1889
             uid = name.split('_')[0]
             report = self.sent2id(self.report[uid])
+            # 报告原文
+            reports_text = self.report[uid]
 
             padd_pre_report = torch.zeros(self.max_len).long()
             padd_pre_report[:len(report)] = report
@@ -134,13 +136,14 @@ class IUSimNDataSet(_DatasetBase):
             images.append(image)
             padd_pre_reports.append(padd_pre_report)
 
-        cur_report = report
+        cur_report_2id = report
+        cur_report = reports_text
         curr_name = name
         images = torch.stack(images, dim=0)
         # 为了代码简洁，循环中最后一步把current report添加进去了，这里去掉
         padd_pre_reports = torch.stack(padd_pre_reports[:-1], dim=0)
 
-        return images, cur_report, index, curr_name, padd_pre_reports
+        return images, cur_report_2id, cur_report, index, curr_name, padd_pre_reports
 
 
 class _MimicBase(_DatasetBase):
@@ -516,7 +519,7 @@ def collate_fn(data):
     # Sort a data list by report length (descending order).
     # sort方法原地排序， sorted构建新的输出
     data.sort(key=lambda x: len(x[1]), reverse=True)
-    images, captions, img_ids, filenames, prev_repos = zip(*data)  # unzip
+    images, captions_2id, captions, img_ids, filenames, prev_repos = zip(*data)  # unzip
 
     # Merge images (from tuple of 3D tensor to 4D tensor).
     images = torch.stack(images, 0)
@@ -525,17 +528,16 @@ def collate_fn(data):
     filenames = list(filenames)
 
     # Merge captions (from tuple of 1D tensor to 2D tensor).
-    lengths = [len(cap) for cap in captions]
-    targets = torch.zeros((len(captions), max(lengths))).long()
-    for i, cap in enumerate(captions):
+    lengths = [len(cap) for cap in captions_2id]
+    targets = torch.zeros((len(captions_2id), max(lengths))).long()
+    for i, cap in enumerate(captions_2id):
         end = lengths[i]
         targets[i, :end] = cap
 
     # condition已经在之前padding为0了，直接stack
     prev_repos = torch.stack(prev_repos, 0)
 
-    return images, targets, lengths, img_ids, filenames, prev_repos
-
+    return images, targets, captions, lengths, img_ids, filenames, prev_repos
 
 def get_loader(image_dir, json_report, csv_pair_split, vocab, transform=None, batch_size=60, shuffle=True, num_workers=4,
                type='single', N=1, max_len=80, subset='train'):

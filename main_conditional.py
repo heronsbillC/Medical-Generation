@@ -38,15 +38,16 @@ def get_data_loader(args, vocab, mode='train'):
 def train(args, Model, optimizer, data_loader, epoch, cnn_optimizer=None):
     Model.train()
     with tqdm(total=len(data_loader), desc=f'Epoch {epoch}/{args.num_epochs}', unit='batch', ncols=80) as pbar:
-        for i, (images, target, lengths, _, _, prev_repo) in enumerate(data_loader):
+        for i, (images, target, captions, lengths, _, _, prev_repo) in enumerate(data_loader):
             # Set mini-batch dataset
-            images, target, prev_repo = to_var(images), to_var(target), to_var(prev_repo)
+            images, target, captions, prev_repo = to_var(images), to_var(target), to_var(captions), to_var(prev_repo)
             lengths = [cap_len - 1 for cap_len in lengths]
+            # 将一个批次的变长序列标注target，去掉起始标记后打包成一个固定长度的序列
             targets = pack_padded_sequence(target[:, 1:], lengths, batch_first=True)[0]
 
             # Forward, Backward and Optimize
-            packed_scores = Model(images, target, prev_repo, lengths, args.basic_model)
-            # Compute loss and backprop
+            packed_scores = Model(images, captions, prev_repo, lengths, args.basic_model)
+            # Compute loss and backprop packed_scores[0]表示所有序列的预测得分
             loss = cal_loss(packed_scores[0], targets, smoothing=True)
             pbar.set_postfix(**{'loss (batch)': loss.item()})
             pbar.update(1)
