@@ -5,6 +5,8 @@ import pandas as pd
 import torch
 import torch.utils.data as data
 from PIL import Image
+from transformers import GPT2Tokenizer
+from torch.nn.utils.rnn import pad_sequence
 
 
 class _DatasetBase(data.Dataset):
@@ -536,8 +538,23 @@ def collate_fn(data):
 
     # condition已经在之前padding为0了，直接stack
     prev_repos = torch.stack(prev_repos, 0)
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    # 初始化一个空列表，用于存储每个caption的编码结果
+    input_ids_list = []
+    captions = list(captions)  # 将captions从元组转换为列表
+    # 循环遍历每个caption
+    for caption in captions:
+        # 使用tokenizer对caption进行编码
+        input_ids = tokenizer.encode(caption, return_tensors='pt')
+        input_ids = input_ids.permute(1, 0)
+        # 将编码结果添加到列表中
+        input_ids_list.append(input_ids)
 
-    return images, targets, captions, lengths, img_ids, filenames, prev_repos
+    # 将列表转换为一个二维张量
+    # 对所有子序列进行填充，使得它们的长度相同
+    input_ids = pad_sequence(input_ids_list, batch_first=True, padding_value=0)
+    input_ids = input_ids.squeeze(2)
+    return images, targets, input_ids, lengths, img_ids, filenames, prev_repos
 
 def get_loader(image_dir, json_report, csv_pair_split, vocab, transform=None, batch_size=60, shuffle=True, num_workers=4,
                type='single', N=1, max_len=80, subset='train'):

@@ -12,6 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 from Models.SubLayers import MultiHeadAttention
 from Models.models import MultiheadAttention
+from Models.misc import idx2words, to_var
 
 DROPOUT = 0.1  # Avoid overfitting
 NUM_HEADS = 8
@@ -249,22 +250,22 @@ class GptDecoder(nn.Module):
         # input_ids = self.tokenizer.encode(captions, return_tensors='pt')
 
         # 初始化一个空列表，用于存储每个caption的编码结果
-        input_ids_list = []
-        captions = list(captions)  # 将captions从元组转换为列表
-        # 循环遍历每个caption
-        for caption in captions:
-            # 使用tokenizer对caption进行编码
-            input_ids = self.tokenizer.encode(caption, return_tensors='pt')
-            input_ids = input_ids.permute(1, 0)
-            # 将编码结果添加到列表中
-            input_ids_list.append(input_ids)
-
-        # 将列表转换为一个二维张量
-        # 对所有子序列进行填充，使得它们的长度相同
-        input_ids = pad_sequence(input_ids_list, batch_first=True,
-                                 padding_value=0)
-        input_ids = input_ids.squeeze(2)
-        output = self.gpt2(input_ids)[0]
+        # input_ids_list = []
+        # captions = list(captions)  # 将captions从元组转换为列表
+        # # 循环遍历每个caption
+        # for caption in captions:
+        #     # 使用tokenizer对caption进行编码
+        #     input_ids = self.tokenizer.encode(caption, return_tensors='pt')
+        #     input_ids = input_ids.permute(1, 0)
+        #     # 将编码结果添加到列表中
+        #     input_ids_list.append(input_ids)
+        #
+        # # 将列表转换为一个二维张量
+        # # 对所有子序列进行填充，使得它们的长度相同
+        # input_ids = pad_sequence(input_ids_list, batch_first=True,
+        #                          padding_value=0)
+        # input_ids = input_ids.squeeze(2)
+        output = self.gpt2(captions)[0]
         # 将output的sequence_length切片或截断到指定长度
         if output.size(1) > fixed_sequence_length:
             output = output[:, :fixed_sequence_length, :]
